@@ -1,0 +1,20 @@
+{
+  "name": "h264-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "server": "node main"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^3.21.2",
+    "mout": "^1.0.0",
+    "stream-split": "^1.1.0",
+    "ws": "^0.8.0"
+  }
+}
