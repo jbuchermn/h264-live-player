@@ -1,159 +1,130 @@
 "use strict";
 
-var Avc            = require('../broadway/Decoder');
+var BroadwayDecoder = require('../broadway/Decoder');
 var YUVWebGLCanvas = require('../canvas/YUVWebGLCanvas');
-var YUVCanvas      = require('../canvas/YUVCanvas');
-var Size           = require('../utils/Size');
-var Class          = require('uclass');
-var Events         = require('uclass/events');
-var debug          = require('debug');
-var log            = debug("wsavc");
+var YUVCanvas = require('../canvas/YUVCanvas');
+var Size = require('../utils/Size');
+var Class = require('uclass');
+var Events = require('uclass/events');
+var debug = require('debug');
+
+
+var log = debug("wsavc");
 
 var WSAvcPlayer = new Class({
-  Implements : [Events],
+    Implements : [Events],
+
+    initialize : function(canvas, canvastype) {
+
+        this.canvas     = canvas;
+        this.canvastype = canvastype;
+
+        // AVC codec initialization
+        this.decoder = new BroadwayDecoder();
+
+        //WebSocket variable
+        this.ws;
+        this.pktnum = 0;
+    },
+
+    decode : function(data) {
+        this.decoder.decode(data);
+    },
+
+    connect : function(url) {
+
+        // Websocket initialization
+        if (this.ws != undefined) {
+            this.ws.close();
+            delete this.ws;
+        }
+        this.ws = new WebSocket(url);
+        this.ws.binaryType = "arraybuffer";
+
+        this.ws.onopen = () => {
+            log("Connected to " + url);
+        };
 
 
-  initialize : function(canvas, canvastype) {
+        var framesList = [];
 
-    this.canvas     = canvas;
-    this.canvastype = canvastype;
+        this.ws.onmessage = (evt) => {
+            if(typeof evt.data == "string")
+                return this.cmd(JSON.parse(evt.data));
 
-    // AVC codec initialization
-    this.avc = new Avc();
-    if(false) this.avc.configure({
-      filter: "original",
-      filterHorLuma: "optimized",
-      filterVerLumaEdge: "optimized",
-      getBoundaryStrengthsA: "optimized"
-    });
-
-    //WebSocket variable
-    this.ws;
-    this.pktnum = 0;
-
-  },
+            this.pktnum++;
+            var frame = new Uint8Array(evt.data);
+            //log("[Pkt " + this.pktnum + " (" + evt.data.byteLength + " bytes)]");
+            //this.decode(frame);
+            framesList.push(frame);
+        };
 
 
-  decode : function(data) {
-    var naltype = "invalid frame";
+        var running = true;
 
-    if (data.length > 4) {
-      if (data[4] == 0x65) {
-        naltype = "I frame";
-      }
-      else if (data[4] == 0x41) {
-        naltype = "P frame";
-      }
-      else if (data[4] == 0x67) {
-        naltype = "SPS";
-      }
-      else if (data[4] == 0x68) {
-        naltype = "PPS";
-      }
-    }
-    //log("Passed " + naltype + " to decoder");
-    this.avc.decode(data);
-  },
+        var shiftFrame = function() {
+            if(!running)
+                return;
 
-  connect : function(url) {
+            if(framesList.length > 10) {
+                log("Dropping frames", framesList.length);
+                framesList = [];
+            }
 
-    // Websocket initialization
-    if (this.ws != undefined) {
-      this.ws.close();
-      delete this.ws;
-    }
-    this.ws = new WebSocket(url);
-    this.ws.binaryType = "arraybuffer";
-
-    this.ws.onopen = () => {
-      log("Connected to " + url);
-    };
+            var frame = framesList.shift();
 
 
-    var framesList = [];
+            if(frame)
+                this.decode(frame);
 
-    this.ws.onmessage = (evt) => {
-      if(typeof evt.data == "string")
-        return this.cmd(JSON.parse(evt.data));
-
-      this.pktnum++;
-      var frame = new Uint8Array(evt.data);
-      //log("[Pkt " + this.pktnum + " (" + evt.data.byteLength + " bytes)]");
-      //this.decode(frame);
-      framesList.push(frame);
-    };
+            requestAnimationFrame(shiftFrame);
+        }.bind(this);
 
 
-    var running = true;
+        shiftFrame();
 
-    var shiftFrame = function() {
-      if(!running)
-        return;
+        this.ws.onclose = () => {
+            running = false;
+            log("WSAvcPlayer: Connection closed")
+        };
 
+    },
 
-      if(framesList.length > 10) {
-        log("Dropping frames", framesList.length);
-        framesList = [];
-      }
+    initCanvas : function(width, height) {
+        var canvasFactory = this.canvastype == "webgl" || this.canvastype == "YUVWebGLCanvas"
+            ? YUVWebGLCanvas
+            : YUVCanvas;
 
-      var frame = framesList.shift();
+        var canvas = new canvasFactory(this.canvas, new Size(width, height));
+        this.decoder.onPictureDecoded = canvas.decode;
+        this.emit("canvasReady", width, height);
+    },
 
+    cmd : function(cmd){
+        log("Incoming request", cmd);
 
-      if(frame)
-        this.decode(frame);
+        if(cmd.action == "init") {
+            this.initCanvas(cmd.width, cmd.height);
+            this.canvas.width  = cmd.width;
+            this.canvas.height = cmd.height;
+        }
+    },
 
-      requestAnimationFrame(shiftFrame);
-    }.bind(this);
+    disconnect : function() {
+        this.ws.close();
+    },
 
+    playStream : function() {
+        var message = "REQUESTSTREAM ";
+        this.ws.send(message);
+        log("Sent " + message);
+    },
 
-    shiftFrame();
-
-
-
-    this.ws.onclose = () => {
-      running = false;
-      log("WSAvcPlayer: Connection closed")
-    };
-
-  },
-
-  initCanvas : function(width, height) {
-    var canvasFactory = this.canvastype == "webgl" || this.canvastype == "YUVWebGLCanvas"
-                        ? YUVWebGLCanvas
-                        : YUVCanvas;
-
-    var canvas = new canvasFactory(this.canvas, new Size(width, height));
-    this.avc.onPictureDecoded = canvas.decode;
-    this.emit("canvasReady", width, height);
-  },
-
-  cmd : function(cmd){
-    log("Incoming request", cmd);
-
-    if(cmd.action == "init") {
-      this.initCanvas(cmd.width, cmd.height);
-      this.canvas.width  = cmd.width;
-      this.canvas.height = cmd.height;
-    }
-  },
-
-  disconnect : function() {
-    this.ws.close();
-  },
-
-  playStream : function() {
-    var message = "REQUESTSTREAM ";
-    this.ws.send(message);
-    log("Sent " + message);
-  },
-
-
-  stopStream : function() {
-    this.ws.send("STOPSTREAM");
-    log("Sent STOPSTREAM");
-  },
+    stopStream : function() {
+        this.ws.send("STOPSTREAM");
+        log("Sent STOPSTREAM");
+    },
 });
 
 
 module.exports = WSAvcPlayer;
-module.exports.debug = debug;
