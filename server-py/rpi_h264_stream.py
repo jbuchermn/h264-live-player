@@ -9,8 +9,9 @@ class RPiCameraConfig:
         self.width = 1280 if 'width' not in kwargs else kwargs['width']
         self.height = 720 if 'height' not in kwargs else kwargs['height']
         self.fps = 30 if 'fps' not in kwargs else kwargs['fps']
-        self.bitarte = 10 * 1.e6 if 'bps' not in kwargs else kwargs['bps']
+        self.bitarte = 10000000 if 'bps' not in kwargs else kwargs['bps']
         self.quality = 20 if 'quality' not in kwargs else kwargs['quality']
+        self.profile = 'baseline' if 'profile' not in kwargs else kwargs['profile']
 
     def start_recording(self, camera, stream):
         camera.resolution = (self.width, self.height)
@@ -18,7 +19,7 @@ class RPiCameraConfig:
 
         camera.start_recording(stream,
                                format='h264',
-                               profile='baseline',
+                               profile=self.profile,
                                quality=self.quality,
                                bitrate=self.bitarte)
 
@@ -33,7 +34,7 @@ class RPiH264Stream:
         self._frame_listeners += [callback]
 
     def _on_frame(self, frame):
-        for f in self.frame_listeners:
+        for f in self._frame_listeners:
             f(frame)
 
     def write(self, b):
@@ -50,6 +51,7 @@ class RPiH264Stream:
 
     def start(self, number_secs=-1):
         with picamera.PiCamera() as camera:
+            print("Starting camera...")
             self._camera.start_recording(camera, self)
             i = 0
             while number_secs == -1 or i < number_secs:
