@@ -1,4 +1,4 @@
-import H264Stream from './wsavc'
+import WSAvc from './wsavc'
 
 import React from "react";
 export default class App extends React.Component {
@@ -8,11 +8,14 @@ export default class App extends React.Component {
     }
 
     componentDidMount(){
-        this.stream = new H264Stream(this.canvasRef.current);
-        this.stream.connect("ws://localhost:8080");
-        setTimeout(()=>{
-            this.stream.playStream();
-        }, 5000);
+        this.stream = new WSAvc(this.canvasRef.current, () => {
+            console.log("Closed");
+        },{
+            type: "webgl",
+            width: 1280,
+            height: 720
+        });
+        this.stream.open("ws://localhost:8080");
     }
 
     render () {

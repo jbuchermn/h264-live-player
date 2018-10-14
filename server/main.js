@@ -8,9 +8,8 @@ const app  = express();
 
 const server  = http.createServer(app);
 const netcat = new NetcatServer(server,{
-    width: 1280,
-    height: 720,
-    fps: 30
+    width: 1024,
+    height: 576
 });
 
 server.listen(8080);
