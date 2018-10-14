@@ -1,4 +1,5 @@
 import WSAvc from './wsavc'
+import MJPEGplayer from './MJPEGplayer'
 
 import React from "react";
 export default class App extends React.Component {
@@ -8,14 +9,14 @@ export default class App extends React.Component {
     }
 
     componentDidMount(){
-        this.stream = new WSAvc(this.canvasRef.current, () => {
+        this.stream = new MJPEGplayer(this.canvasRef.current, () => {
             console.log("Closed");
         },{
             type: "webgl",
-            width: 1280,
-            height: 720
+            width: 640,
+            height: 480
         });
-        this.stream.open("ws://localhost:8080");
+        this.stream.open("ws://172.16.0.105:5001");
     }
 
     render () {
