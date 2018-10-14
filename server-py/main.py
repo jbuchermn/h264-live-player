@@ -3,10 +3,10 @@ from ws_server import WSServer
 
 if __name__ == '__main__':
     stream = RPiH264Stream(RPiCameraConfig(
-        width=640,
-        height=480,
-        fps=24,
-        quality=30))
+        width=1280,
+        height=720,
+        fps=10,
+        quality=10))
 
     server = WSServer(5001)
     stream.on_frame(server.on_frame)

@@ -9,7 +9,7 @@ class RPiCameraConfig:
         self.width = 1280 if 'width' not in kwargs else kwargs['width']
         self.height = 720 if 'height' not in kwargs else kwargs['height']
         self.fps = 30 if 'fps' not in kwargs else kwargs['fps']
-        self.bitarte = 10000000 if 'bps' not in kwargs else kwargs['bps']
+        self.bps = 0 if 'bps' not in kwargs else kwargs['bps']
         self.quality = 20 if 'quality' not in kwargs else kwargs['quality']
         self.profile = 'baseline' if 'profile' not in kwargs else kwargs['profile']
 
@@ -21,7 +21,7 @@ class RPiCameraConfig:
                                format='h264',
                                profile=self.profile,
                                quality=self.quality,
-                               bitrate=self.bitarte)
+                               bitrate=self.bps)
 
 
 class RPiH264Stream:
@@ -61,7 +61,10 @@ class RPiH264Stream:
 
 if __name__ == '__main__':
     stream = RPiH264Stream(RPiCameraConfig(
-        quality=10))
+        width=1920,
+        height=1080,
+        fps=30,
+        quality=20))
 
     with open('tmp.h264', 'wb') as f:
         def on_frame(frame):
